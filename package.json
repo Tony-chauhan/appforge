@@ -1,0 +1,21 @@
+{
+  "name": "appforge",
+  "version": "1.0.0",
+  "description": "Natural Language → Application Compiler: Multi-stage pipeline that converts plain English into validated, executable app configurations",
+  "main": "server.js",
+  "type": "module",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node --watch server.js",
+    "eval": "node src/evaluation/runner.js"
+  },
+  "dependencies": {
+    "@google/generative-ai": "^0.24.0",
+    "ajv": "^8.17.1",
+    "ajv-formats": "^3.0.1",
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.7",
+    "express": "^4.21.2",
+    "uuid": "^11.1.0"
+  }
+}
