@@ -1,0 +1,351 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AppForge — Architecture Walkthrough</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+:root{--bg:#0a0e1a;--card:#131a2e;--border:#1e293b;--blue:#3b82f6;--cyan:#06b6d4;--green:#10b981;--amber:#f59e0b;--red:#ef4444;--purple:#8b5cf6;--text:#e2e8f0;--muted:#64748b}
+body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);overflow:hidden;height:100vh}
+.slide{display:none;flex-direction:column;justify-content:center;align-items:center;height:100vh;padding:3rem 6rem;animation:fadeIn .5s ease}
+.slide.active{display:flex}
+@keyframes fadeIn{from{opacity:0;transform:translateY(20px)}to{opacity:1;transform:translateY(0)}}
+
+/* Title slide */
+.title-slide h1{font-size:4rem;font-weight:900;background:linear-gradient(135deg,#3b82f6,#8b5cf6,#06b6d4);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;margin-bottom:1rem;text-align:center}
+.title-slide .subtitle{font-size:1.4rem;color:var(--muted);text-align:center;max-width:700px;line-height:1.6}
+.title-slide .author{margin-top:2rem;font-size:1.1rem;color:var(--cyan);font-weight:600}
+.title-slide .badge{margin-top:.5rem;padding:.4rem 1.2rem;background:var(--card);border:1px solid var(--border);border-radius:20px;font-size:.85rem;color:var(--muted);font-family:'JetBrains Mono',monospace}
+
+/* Content slides */
+.slide h2{font-size:2.4rem;font-weight:800;margin-bottom:2rem;text-align:center}
+.slide h2 .accent{color:var(--blue)}
+.slide h3{font-size:1.2rem;color:var(--cyan);margin-bottom:1rem;font-weight:600}
+
+/* Pipeline diagram */
+.pipeline{display:flex;align-items:center;gap:.5rem;flex-wrap:wrap;justify-content:center;margin:1.5rem 0}
+.pipe-stage{background:var(--card);border:2px solid var(--border);border-radius:14px;padding:1rem 1.5rem;text-align:center;min-width:160px;transition:all .3s}
+.pipe-stage:hover{border-color:var(--blue);transform:translateY(-4px);box-shadow:0 8px 30px rgba(59,130,246,.2)}
+.pipe-stage .num{font-size:.7rem;color:var(--blue);font-weight:700;text-transform:uppercase;letter-spacing:.1em}
+.pipe-stage .name{font-size:1rem;font-weight:700;margin:.3rem 0}
+.pipe-stage .desc{font-size:.75rem;color:var(--muted)}
+.pipe-arrow{font-size:1.5rem;color:var(--muted)}
+
+/* Grid layouts */
+.grid-2{display:grid;grid-template-columns:1fr 1fr;gap:1.5rem;width:100%;max-width:1000px}
+.grid-3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:1rem;width:100%;max-width:1000px}
+.g-card{background:var(--card);border:1px solid var(--border);border-radius:14px;padding:1.5rem;transition:border-color .3s}
+.g-card:hover{border-color:var(--blue)}
+.g-card .icon{font-size:2rem;margin-bottom:.5rem}
+.g-card h4{font-size:1rem;font-weight:700;margin-bottom:.5rem}
+.g-card p,.g-card li{font-size:.85rem;color:var(--muted);line-height:1.6}
+.g-card ul{list-style:none;padding:0}
+.g-card li::before{content:'→ ';color:var(--blue)}
+
+/* Table */
+.s-table{width:100%;max-width:900px;border-collapse:collapse;margin:1rem 0}
+.s-table th{text-align:left;padding:.6rem 1rem;border-bottom:2px solid var(--border);color:var(--muted);font-size:.75rem;text-transform:uppercase;letter-spacing:.08em}
+.s-table td{padding:.6rem 1rem;border-bottom:1px solid var(--border);font-size:.9rem}
+.s-table .check{color:var(--green);font-weight:700}
+
+/* Code block */
+.code-block{background:#0d1117;border:1px solid var(--border);border-radius:10px;padding:1.2rem 1.5rem;font-family:'JetBrains Mono',monospace;font-size:.8rem;line-height:1.7;color:#c9d1d9;max-width:800px;width:100%;overflow-x:auto;white-space:pre}
+.code-block .kw{color:#ff7b72}
+.code-block .fn{color:#d2a8ff}
+.code-block .str{color:#a5d6ff}
+.code-block .cmt{color:#8b949e}
+
+/* Stats row */
+.stats{display:flex;gap:2rem;margin:1.5rem 0}
+.stat{text-align:center}
+.stat .val{font-size:2.5rem;font-weight:800;background:linear-gradient(135deg,var(--blue),var(--cyan));-webkit-background-clip:text;-webkit-text-fill-color:transparent}
+.stat .lbl{font-size:.8rem;color:var(--muted);margin-top:.3rem}
+
+/* Navigation */
+.nav{position:fixed;bottom:2rem;left:50%;transform:translateX(-50%);display:flex;align-items:center;gap:1rem;background:rgba(19,26,46,.9);backdrop-filter:blur(20px);padding:.6rem 1.5rem;border-radius:30px;border:1px solid var(--border);z-index:100}
+.nav button{background:var(--blue);color:white;border:none;padding:.5rem 1.2rem;border-radius:8px;cursor:pointer;font-weight:600;font-size:.85rem;transition:all .2s}
+.nav button:hover{transform:scale(1.05)}
+.nav button:disabled{opacity:.3;cursor:default;transform:none}
+.nav .counter{font-family:'JetBrains Mono',monospace;font-size:.8rem;color:var(--muted);min-width:60px;text-align:center}
+
+/* Highlight colors */
+.hl-green{color:var(--green)}.hl-blue{color:var(--blue)}.hl-amber{color:var(--amber)}.hl-red{color:var(--red)}.hl-purple{color:var(--purple)}.hl-cyan{color:var(--cyan)}
+
+/* Comparison */
+.compare{display:flex;gap:2rem;width:100%;max-width:900px}
+.compare>div{flex:1;padding:1.5rem;border-radius:14px}
+.compare .bad{background:rgba(239,68,68,.08);border:1px solid rgba(239,68,68,.2)}
+.compare .good{background:rgba(16,185,129,.08);border:1px solid rgba(16,185,129,.2)}
+.compare h4{margin-bottom:.8rem;font-size:1rem}
+</style>
+</head>
+<body>
+
+<!-- SLIDE 1: Title -->
+<div class="slide title-slide active" id="s1">
+  <h1>⚡ AppForge</h1>
+  <div class="subtitle">A Compiler for Software Generation:<br>Natural Language → Structured Config → Validated → Executable</div>
+  <div class="author">Built by Dharmender Chauhan</div>
+  <div class="badge">AI Platform Engineer — Demo Task Submission</div>
+</div>
+
+<!-- SLIDE 2: Problem & Approach -->
+<div class="slide" id="s2">
+  <h2>The <span class="accent">Problem</span></h2>
+  <div class="compare">
+    <div class="bad">
+      <h4 class="hl-red">❌ Naive Approach</h4>
+      <ul style="list-style:none;padding:0">
+        <li style="color:var(--muted);margin:.4rem 0">• Single prompt → LLM</li>
+        <li style="color:var(--muted);margin:.4rem 0">• No validation</li>
+        <li style="color:var(--muted);margin:.4rem 0">• Inconsistent output</li>
+        <li style="color:var(--muted);margin:.4rem 0">• Hallucinated fields</li>
+        <li style="color:var(--muted);margin:.4rem 0">• Can't be executed</li>
+      </ul>
+    </div>
+    <div class="good">
+      <h4 class="hl-green">✅ AppForge Approach</h4>
+      <ul style="list-style:none;padding:0">
+        <li style="color:var(--muted);margin:.4rem 0">• Multi-stage compiler pipeline</li>
+        <li style="color:var(--muted);margin:.4rem 0">• JSON Schema validation at every stage</li>
+        <li style="color:var(--muted);margin:.4rem 0">• Auto-repair engine</li>
+        <li style="color:var(--muted);margin:.4rem 0">• Cross-layer consistency</li>
+        <li style="color:var(--muted);margin:.4rem 0">• Generates executable code</li>
+      </ul>
+    </div>
+  </div>
+</div>
+
+<!-- SLIDE 3: Pipeline Architecture -->
+<div class="slide" id="s3">
+  <h2>Multi-Stage <span class="accent">Pipeline</span></h2>
+  <div class="pipeline">
+    <div class="pipe-stage"><div class="num">Stage 1</div><div class="name">Intent Extraction</div><div class="desc">NL → structured intent</div></div>
+    <div class="pipe-arrow">→</div>
+    <div class="pipe-stage"><div class="num">Stage 2</div><div class="name">System Design</div><div class="desc">Intent → architecture</div></div>
+    <div class="pipe-arrow">→</div>
+    <div class="pipe-stage"><div class="num">Stage 3</div><div class="name">Schema Gen</div><div class="desc">Design → 5 config layers</div></div>
+    <div class="pipe-arrow">→</div>
+    <div class="pipe-stage"><div class="num">Stage 4</div><div class="name">Refinement</div><div class="desc">Cross-layer repair</div></div>
+    <div class="pipe-arrow">→</div>
+    <div class="pipe-stage"><div class="num">Stage 5</div><div class="name">Validation</div><div class="desc">Final check + runtime</div></div>
+  </div>
+  <p style="color:var(--muted);text-align:center;max-width:700px;margin-top:1rem">Each stage produces a validated intermediate representation (IR), just like a compiler. If a stage fails validation, it retries with error context — <strong style="color:var(--text)">not a blind full retry</strong>.</p>
+</div>
+
+<!-- SLIDE 4: Why Multi-Stage -->
+<div class="slide" id="s4">
+  <h2>Why <span class="accent">Multi-Stage?</span></h2>
+  <div class="grid-2">
+    <div class="g-card">
+      <div class="icon">🎯</div>
+      <h4>Focused Responsibility</h4>
+      <p>Each stage has a single job with a constrained output format. Smaller context = less hallucination.</p>
+    </div>
+    <div class="g-card">
+      <div class="icon">🔍</div>
+      <h4>Intermediate Validation</h4>
+      <p>We validate between stages. Catch errors early before they propagate downstream.</p>
+    </div>
+    <div class="g-card">
+      <div class="icon">🔧</div>
+      <h4>Targeted Repair</h4>
+      <p>If Schema Gen fails, we re-run only that stage — not the entire pipeline. Saves cost + time.</p>
+    </div>
+    <div class="g-card">
+      <div class="icon">📊</div>
+      <h4>Determinism</h4>
+      <p>Structured prompts + JSON mode + temp 0.1 = consistent, predictable outputs across runs.</p>
+    </div>
+  </div>
+</div>
+
+<!-- SLIDE 5: Schema Layers -->
+<div class="slide" id="s5">
+  <h2>5 Output <span class="accent">Layers</span></h2>
+  <div class="grid-3" style="max-width:1100px">
+    <div class="g-card"><div class="icon">🖥️</div><h4>UI Config</h4><p>Pages, components, navigation, theme, layouts, data bindings</p></div>
+    <div class="g-card"><div class="icon">🔌</div><h4>API Config</h4><p>Endpoints, methods, auth rules, request/response schemas</p></div>
+    <div class="g-card"><div class="icon">🗄️</div><h4>DB Schema</h4><p>Tables, columns, types, foreign keys, indexes, constraints</p></div>
+    <div class="g-card"><div class="icon">🔐</div><h4>Auth Config</h4><p>JWT strategy, roles, permissions (CRUD per resource), access rules</p></div>
+    <div class="g-card"><div class="icon">⚙️</div><h4>Business Logic</h4><p>Rules engine with triggers, conditions, actions, computed fields</p></div>
+    <div class="g-card" style="border-color:var(--green)"><div class="icon">✅</div><h4>All Cross-Validated</h4><p>API fields match DB. UI maps to API. Roles consistent everywhere.</p></div>
+  </div>
+</div>
+
+<!-- SLIDE 6: Validation + Repair -->
+<div class="slide" id="s6">
+  <h2>Validation & <span class="accent">Repair Engine</span></h2>
+  <p style="color:var(--amber);font-weight:600;margin-bottom:1.5rem">⚠️ This is the most critical part of the system</p>
+  <table class="s-table">
+    <thead><tr><th>Error Type</th><th>Detection</th><th>Auto-Repair Strategy</th></tr></thead>
+    <tbody>
+      <tr><td>Missing required fields</td><td>AJV schema validation</td><td class="check">✓ Add context-aware defaults</td></tr>
+      <tr><td>Type mismatches</td><td>AJV type checking</td><td class="check">✓ Coerce to expected type</td></tr>
+      <tr><td>Invalid enum values</td><td>AJV enum validation</td><td class="check">✓ Fuzzy match closest valid value</td></tr>
+      <tr><td>Pattern violations</td><td>AJV pattern check</td><td class="check">✓ Auto-fix (e.g. prepend /)</td></tr>
+      <tr><td>Hallucinated fields</td><td>additionalProperties</td><td class="check">✓ Strip unknown properties</td></tr>
+      <tr><td>Cross-layer mismatch</td><td>Custom cross-validator</td><td class="check">✓ Add missing roles/tables/endpoints</td></tr>
+      <tr><td>Invalid JSON</td><td>Parse error</td><td class="check">✓ Extract from fences, fix commas</td></tr>
+    </tbody>
+  </table>
+</div>
+
+<!-- SLIDE 7: Cross-Layer Validation -->
+<div class="slide" id="s7">
+  <h2>Cross-Layer <span class="accent">Consistency</span></h2>
+  <div class="grid-2">
+    <div class="g-card">
+      <h4 class="hl-cyan">🔗 API ↔ DB Check</h4>
+      <ul>
+        <li>Every API endpoint's entity must have a matching DB table</li>
+        <li>If missing → auto-create table with default schema</li>
+      </ul>
+    </div>
+    <div class="g-card">
+      <h4 class="hl-cyan">🔗 UI ↔ API Check</h4>
+      <ul>
+        <li>Every UI component's dataSource must reference a real API endpoint</li>
+        <li>If missing → flag warning for review</li>
+      </ul>
+    </div>
+    <div class="g-card">
+      <h4 class="hl-cyan">🔗 Auth ↔ All Check</h4>
+      <ul>
+        <li>Every role used in UI pages and API endpoints must exist in auth config</li>
+        <li>If missing → auto-add role definition</li>
+      </ul>
+    </div>
+    <div class="g-card">
+      <h4 class="hl-cyan">🔗 DB Self-Check</h4>
+      <ul>
+        <li>Every foreign key must reference an existing table</li>
+        <li>Every column type must be valid PostgreSQL</li>
+      </ul>
+    </div>
+  </div>
+</div>
+
+<!-- SLIDE 8: Execution Awareness -->
+<div class="slide" id="s8">
+  <h2>Execution <span class="accent">Awareness</span></h2>
+  <p style="color:var(--muted);margin-bottom:1.5rem;max-width:700px;text-align:center">Output isn't just JSON — it generates <strong style="color:var(--text)">actual runnable code</strong></p>
+  <div class="grid-3">
+    <div class="g-card"><div class="icon">🗄️</div><h4>SQL DDL</h4><p>Complete CREATE TABLE with foreign keys, indexes, CHECK constraints, defaults</p></div>
+    <div class="g-card"><div class="icon">🔌</div><h4>Express.js Routes</h4><p>Full route handlers with auth middleware, CRUD, error handling</p></div>
+    <div class="g-card"><div class="icon">🖥️</div><h4>React Preview</h4><p>Rendered HTML dashboard with navigation, components, data bindings</p></div>
+    <div class="g-card"><div class="icon">🔐</div><h4>Auth Middleware</h4><p>JWT verify + role-based authorize functions + permission checks</p></div>
+    <div class="g-card"><div class="icon">⚙️</div><h4>Business Rules</h4><p>Executable rule engine class with conditions and action handlers</p></div>
+    <div class="g-card" style="border-color:var(--green)"><div class="icon">🚀</div><h4>All Executable</h4><p>Every artifact can be dropped into a project and run immediately</p></div>
+  </div>
+</div>
+
+<!-- SLIDE 9: Failure Handling -->
+<div class="slide" id="s9">
+  <h2>Failure <span class="accent">Handling</span></h2>
+  <table class="s-table">
+    <thead><tr><th>Input Type</th><th>Example</th><th>System Response</th></tr></thead>
+    <tbody>
+      <tr><td class="hl-amber">Vague</td><td>"Make me an app"</td><td>Documents assumptions, infers defaults, flags ambiguities</td></tr>
+      <tr><td class="hl-red">Conflicting</td><td>"Public app with strict access control"</td><td>Resolves contradiction, documents the decision</td></tr>
+      <tr><td class="hl-amber">Incomplete</td><td>"I need a dashboard"</td><td>Infers app type, adds standard features</td></tr>
+      <tr><td class="hl-purple">Over-complex</td><td>"Social + E-com + IoT + AR + ML"</td><td>Prioritizes core features, notes limitations</td></tr>
+      <tr><td class="hl-cyan">Typos</td><td>"bild ecommrce stor"</td><td>Understands intent despite errors</td></tr>
+      <tr><td class="hl-red">Contradictory</td><td>"All users are admins but limited"</td><td>Resolves hierarchy, documents assumption</td></tr>
+    </tbody>
+  </table>
+</div>
+
+<!-- SLIDE 10: Evaluation -->
+<div class="slide" id="s10">
+  <h2>Evaluation <span class="accent">Framework</span></h2>
+  <div class="stats">
+    <div class="stat"><div class="val">20</div><div class="lbl">Test Prompts</div></div>
+    <div class="stat"><div class="val">10</div><div class="lbl">Real Products</div></div>
+    <div class="stat"><div class="val">10</div><div class="lbl">Edge Cases</div></div>
+    <div class="stat"><div class="val">5</div><div class="lbl">Quality Metrics</div></div>
+  </div>
+  <div class="grid-2" style="max-width:800px">
+    <div class="g-card">
+      <h4>Real Product Prompts</h4>
+      <ul><li>CRM with Payments</li><li>E-Commerce Store</li><li>Project Management SaaS</li><li>Social Network</li><li>Healthcare System</li><li>+ 5 more</li></ul>
+    </div>
+    <div class="g-card">
+      <h4>Metrics Tracked</h4>
+      <ul><li>Success rate per prompt</li><li>Retries per request</li><li>Quality score (0-100)</li><li>Latency per stage</li><li>Runtime executability</li></ul>
+    </div>
+  </div>
+</div>
+
+<!-- SLIDE 11: Cost vs Quality -->
+<div class="slide" id="s11">
+  <h2>Cost vs <span class="accent">Quality</span> Tradeoffs</h2>
+  <table class="s-table" style="max-width:800px">
+    <thead><tr><th>Strategy</th><th>Impact</th><th>Tradeoff</th></tr></thead>
+    <tbody>
+      <tr><td>Temperature 0.1</td><td class="hl-green">↓ Variance, ↓ Retries</td><td>Less creative naming</td></tr>
+      <tr><td>JSON response mode</td><td class="hl-green">↓ Parse failures to ~0</td><td>None (free win)</td></tr>
+      <tr><td>Targeted stage retry</td><td class="hl-green">↓ Cost by ~60%</td><td>Slight complexity</td></tr>
+      <tr><td>Local auto-repair</td><td class="hl-green">↓ LLM calls by ~40%</td><td>Default values may be generic</td></tr>
+      <tr><td>Modular stages</td><td class="hl-green">↑ Reliability</td><td>Higher total latency (~3 LLM calls)</td></tr>
+    </tbody>
+  </table>
+  <div class="stats" style="margin-top:1.5rem">
+    <div class="stat"><div class="val">~$0.002</div><div class="lbl">Cost per Generation</div></div>
+    <div class="stat"><div class="val">~12K</div><div class="lbl">Tokens per Run</div></div>
+    <div class="stat"><div class="val">~10s</div><div class="lbl">Avg Latency (Flash)</div></div>
+  </div>
+</div>
+
+<!-- SLIDE 12: Tech Stack -->
+<div class="slide" id="s12">
+  <h2>Tech <span class="accent">Stack</span></h2>
+  <div class="grid-3" style="max-width:900px">
+    <div class="g-card"><div class="icon">🟢</div><h4>Node.js + Express</h4><p>Server with SSE streaming for real-time pipeline progress</p></div>
+    <div class="g-card"><div class="icon">🤖</div><h4>Gemini 2.0 Flash</h4><p>Fast, cheap, JSON mode support. Configurable provider.</p></div>
+    <div class="g-card"><div class="icon">✅</div><h4>AJV Validator</h4><p>7 JSON Schemas for formal output verification</p></div>
+    <div class="g-card"><div class="icon">🎨</div><h4>Vanilla Frontend</h4><p>Zero dependencies. Dark theme with pipeline visualization.</p></div>
+    <div class="g-card"><div class="icon">📦</div><h4>14 Source Files</h4><p>Clean separation: pipeline, validation, runtime, eval</p></div>
+    <div class="g-card"><div class="icon">🚀</div><h4>One Command</h4><p>npm start → full system running on port 3000</p></div>
+  </div>
+</div>
+
+<!-- SLIDE 13: Summary -->
+<div class="slide title-slide" id="s13">
+  <h1>Summary</h1>
+  <div style="max-width:700px;text-align:left;margin-top:1rem">
+    <p style="color:var(--muted);line-height:2;font-size:1.1rem">
+      <span class="hl-green">✓</span> Multi-stage compiler pipeline (not a single prompt)<br>
+      <span class="hl-green">✓</span> Strict schema enforcement with 7 JSON Schemas<br>
+      <span class="hl-green">✓</span> Auto-repair engine with 7 repair strategies<br>
+      <span class="hl-green">✓</span> Cross-layer consistency validation<br>
+      <span class="hl-green">✓</span> Runtime code generation (SQL, Express, React, Auth)<br>
+      <span class="hl-green">✓</span> Handles vague, conflicting, incomplete inputs<br>
+      <span class="hl-green">✓</span> 20-prompt evaluation framework with metrics<br>
+      <span class="hl-green">✓</span> Cost optimization analysis with real numbers
+    </p>
+  </div>
+  <div class="author" style="margin-top:2rem">Dharmender Chauhan</div>
+  <div class="badge">github.com/Tony-chauhan/appforge</div>
+</div>
+
+<!-- Navigation -->
+<div class="nav">
+  <button id="prev" disabled>← Prev</button>
+  <span class="counter" id="counter">1 / 13</span>
+  <button id="next">Next →</button>
+</div>
+
+<script>
+const slides=document.querySelectorAll('.slide');
+let cur=0;
+const prev=document.getElementById('prev'),next=document.getElementById('next'),counter=document.getElementById('counter');
+function go(n){slides[cur].classList.remove('active');cur=n;slides[cur].classList.add('active');prev.disabled=cur===0;next.disabled=cur===slides.length-1;counter.textContent=`${cur+1} / ${slides.length}`}
+prev.addEventListener('click',()=>go(cur-1));
+next.addEventListener('click',()=>go(cur+1));
+document.addEventListener('keydown',e=>{if(e.key==='ArrowRight'||e.key===' ')cur<slides.length-1&&go(cur+1);if(e.key==='ArrowLeft')cur>0&&go(cur-1)});
+</script>
+</body>
+</html>
